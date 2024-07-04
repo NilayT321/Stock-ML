@@ -2,8 +2,37 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import datetime
+import sys 
 
-url = r"https://finance.yahoo.com/quote/%5ESPX/history"
+# Command line arguments 
+# Running the script with the -tenyr flag will fetch data for the past 10 years, using some UNIX epoch manipulations 
+args = sys.argv
+
+# If the file is ran with the -tenyr flag, fetch data from the past 10 years, starting from now 
+# It should be the last argument
+if args[-1] == '-tenyr':
+    # Current date and time. To prevent possible issues with a date where there is no data, consider a day before.
+    current = datetime.datetime.now(datetime.timezone.utc)
+    current = current - datetime.timedelta(days = 1)
+
+    # Set the time to 12:00 AM 
+    current = current.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+
+    # Get the date 10 years before. 
+    ten_yrs_ago = datetime.datetime(year = current.year - 10, day = current.day, month = current.month) 
+
+    # UNIX epoch for current date 
+    current_timestamp = int(current.timestamp())
+    ten_yrs_timestamp = int(ten_yrs_ago.timestamp())
+
+    url = f"https://finance.yahoo.com/quote/%5ESPX/history/?period1={ten_yrs_timestamp}&period2={current_timestamp}"
+
+    # Name the file differently, depending on what flag was passed 
+    outfile = "spx_ten_years.csv"
+else:
+    url = r"https://finance.yahoo.com/quote/%5ESPX/history"
+    outfile = "spx.csv"
+
 headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 'DNT' : '1'}
 req = requests.get(url, headers = headers)
 
@@ -22,7 +51,7 @@ days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturda
 
 # Loop over all rows 
 row_count = 0
-with open('spx.csv', 'w') as f:
+with open(outfile, 'w') as f:
     # Write the file header 
     spx_writer = csv.writer(f, delimiter=',')
     spx_writer.writerow(["Date", "Open", "High", "Low", "Close"])
@@ -49,4 +78,4 @@ with open('spx.csv', 'w') as f:
         spx_writer.writerow([days_of_week[date_object.weekday()], date_str] + [float(item.string.replace(',', '')) for item in attributes[1:]])
         row_count += 1
 
-print("Finished creating file spx.csv. Wrote {row_count} rows.".format(row_count = row_count))
+print(f"Finished creating file {outfile}. Wrote {row_count} rows.")
